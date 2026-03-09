@@ -7,7 +7,9 @@ export default function Home() {
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-
+  // Rate-limited Action State
+  const [rateMsg, setRateMsg] = useState("");
+  const [rateLoading, setRateLoading] = useState(false);
   // Debounce function
   function debounce(fn, delay) {
     let timer;
@@ -45,10 +47,7 @@ export default function Home() {
     debouncedSearch(value);
   };
 
-  // Rate-limited Action State
-  const [rateMsg, setRateMsg] = useState("");
-  const [rateLoading, setRateLoading] = useState(false);
-
+  // Rate-limited Action Handler
   const handleRateLimitedAction = async () => {
     setRateLoading(true);
     setRateMsg("");
@@ -67,7 +66,38 @@ export default function Home() {
     }
     setRateLoading(false);
   };
+  const [name, setName] = useState("");
+  const [message, setMessage] = useState("");
+  const [feedbackMsg, setFeedbackMsg] = useState("");
+  const [feedbackLoading, setFeedbackLoading] = useState(false);
 
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setFeedbackMsg("");
+    setFeedbackLoading(true);
+    try {
+      const res = await fetch("/api/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, message }),
+      });
+      const data = await res.json();
+      if (res.status === 429) {
+        setFeedbackMsg(
+          data.error || "You are submitting too quickly. Please wait.",
+        );
+      } else if (!res.ok) {
+        setFeedbackMsg(data.error || "An error occurred. Try again.");
+      } else {
+        setFeedbackMsg(data.message || "Feedback submitted!");
+        setName("");
+        setMessage("");
+      }
+    } catch (err) {
+      setFeedbackMsg("Network error. Try again.");
+    }
+    setFeedbackLoading(false);
+  };
   return (
     <div className="container py-5">
       <Head>
@@ -76,10 +106,13 @@ export default function Home() {
       <main>
         <h2 className="mb-4 text-center">Debounce & Rate Limiting Demo</h2>
         <div className="row">
-          <div className="col-md-6 mb-4">
+          <div className="col-md-4 mb-4">
             <div className="card shadow">
               <div className="card-body">
                 <h4 className="card-title mb-3 text-center">Debounce Search</h4>
+                <p className="text-muted text-center mb-3">
+                  Search,The results update after you stop typing.
+                </p>
                 <div className="input-group mb-3">
                   <input
                     type="text"
@@ -104,7 +137,14 @@ export default function Home() {
                     </div>
                   </div>
                 )}
-                <ul className="list-group">
+                <ul
+                  className="list-group"
+                  style={{
+                    maxHeight: "50vh",
+                    minHeight: "100px",
+                    overflowY: "auto",
+                  }}
+                >
                   {results.map((item, idx) => (
                     <li key={idx} className="list-group-item">
                       {item}
@@ -119,12 +159,15 @@ export default function Home() {
               </div>
             </div>
           </div>
-          <div className="col-md-6 mb-4">
+          <div className="col-md-4 mb-4">
             <div className="card shadow">
               <div className="card-body">
                 <h4 className="card-title mb-3 text-center">
                   Rate Limited Action
                 </h4>
+                <p className="text-muted text-center mb-3">
+                  only 1 request/sec
+                </p>
                 <div className="d-grid gap-2 mb-3">
                   <button
                     className="btn btn-primary btn-lg"
@@ -150,10 +193,62 @@ export default function Home() {
                     {rateMsg}
                   </div>
                 )}
-                <p className="text-muted text-center mb-0">
-                  This button is protected by server-side rate limiting (1
-                  request/sec).
+              </div>
+            </div>
+          </div>
+          <div className="col-md-4 mb-4">
+            <div className="card shadow">
+              <div className="card-body">
+                <h4 className="card-title mb-3 text-center">
+                  Rate-Limited Feedback
+                </h4>
+                <p className="text-muted text-center mb-3">
+                  You can submit feedback once every 5 seconds.
                 </p>
+                <form onSubmit={handleSubmit}>
+                  <div className="mb-3">
+                    <input
+                      type="text"
+                      className="form-control"
+                      placeholder="Your Name"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                    />
+                  </div>
+                  <div className="mb-3">
+                    <textarea
+                      className="form-control"
+                      placeholder="Your Feedback"
+                      value={message}
+                      onChange={(e) => setMessage(e.target.value)}
+                    />
+                  </div>
+                  <div className="d-grid gap-2 mb-2">
+                    <button
+                      type="submit"
+                      className="btn btn-success btn-lg"
+                      disabled={feedbackLoading}
+                    >
+                      {feedbackLoading ? (
+                        <span
+                          className="spinner-border spinner-border-sm"
+                          role="status"
+                          aria-hidden="true"
+                        ></span>
+                      ) : (
+                        "Submit Feedback"
+                      )}
+                    </button>
+                  </div>
+                  {feedbackMsg && (
+                    <div
+                      className={`alert ${feedbackMsg.includes("too quickly") ? "alert-danger" : "alert-success"} py-2 text-center`}
+                      role="alert"
+                    >
+                      {feedbackMsg}
+                    </div>
+                  )}
+                </form>
               </div>
             </div>
           </div>
